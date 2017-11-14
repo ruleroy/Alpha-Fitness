@@ -1,10 +1,13 @@
 package com.vannakittikun.alphafitness;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Fragment;
 import android.app.FragmentManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationListener;
@@ -14,6 +17,7 @@ import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Looper;
+import android.os.Parcelable;
 import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -28,6 +32,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.Chronometer;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -97,6 +102,22 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
 
     MyDBHandler dbHandler;
 
+    private BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if(intent.hasExtra("update")) {
+                distanceText.setText(df2.format(metersToMiles(distance)));
+            }
+
+            if(intent.hasExtra("latLng")) {
+                Bundle bundle = intent.getParcelableExtra("latLng");
+                LatLng latLng = bundle.getParcelable("bundleLatLng");
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 17));
+            }
+        }
+    };
+
+
     // TODO: Rename parameter arguments, choose names that match
     // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
     private static final String ARG_PARAM1 = "param1";
@@ -133,11 +154,13 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setRetainInstance(true);
         if (getArguments() != null) {
             mParam1 = getArguments().getString(ARG_PARAM1);
             mParam2 = getArguments().getString(ARG_PARAM2);
         }
     }
+
 
     @Override
     public void onSaveInstanceState(Bundle outState) {
@@ -148,9 +171,12 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
         outState.putDouble("beginLng", beginLng);
         outState.putDouble("endLat", endLat);
         outState.putDouble("endLng", endLng);
-        outState.putDouble("lastLat", currentLatitude);
-        outState.putDouble("lastLng", currentLongitude);
+        //outState.putDouble("lastLat", currentLatitude);
+        //outState.putDouble("lastLng", currentLongitude);
+        outState.putBoolean("workoutMode", workoutMode);
+        outState.putLong("stopTime", stopTime);
     }
+
 
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
@@ -161,12 +187,22 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
         parentView = getActivity().findViewById(R.id.parentView);
         chronometer = getActivity().findViewById(R.id.chronometer);
         distanceText = getActivity().findViewById(R.id.distanceText);
+        startWorkout = getActivity().findViewById(R.id.startWorkout);
 
         df2 = new DecimalFormat("#.###");
 
         if (savedInstanceState != null) {
-            chronometer.setBase(savedInstanceState.getLong("chronometer"));
-            chronometer.start();
+            workoutMode = savedInstanceState.getBoolean("workoutMode");
+
+            if(workoutMode) {
+                chronometer.setBase(savedInstanceState.getLong("chronometer"));
+                chronometer.start();
+                startWorkout.setText("Stop Workout");
+                startWorkout.setBackgroundColor(getResources().getColor(R.color.googleRed));
+            } else {
+                chronometer.setBase(SystemClock.elapsedRealtime() + savedInstanceState.getLong("stopTime"));
+            }
+
             distance = savedInstanceState.getDouble("distance");
             distanceText.setText(df2.format(metersToMiles(distance)));
 
@@ -175,9 +211,13 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
             endLat = savedInstanceState.getDouble("endLat");
             endLng = savedInstanceState.getDouble("endLng");
 
-            mLastLocation = new Location("");
-            mLastLocation.setLatitude(savedInstanceState.getDouble("lastLat"));
-            mLastLocation.setLongitude(savedInstanceState.getDouble("lastLng"));
+
+            //mLastLocation = new Location("");
+            //mLastLocation.setLatitude(savedInstanceState.getDouble("lastLat"));
+            //mLastLocation.setLongitude(savedInstanceState.getDouble("lastLng"));
+
+            //Bundle bundle = savedInstanceState.getBundle("bundleGoogle");
+            //mGoogleApiClient = bundle.getParcelable("mGoogleApiClient");
         }
 
 
@@ -201,6 +241,16 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
 
         ImageButton imageButton = view.findViewById(R.id.imageButton);
         imageButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(getActivity(), UserProfileActivity.class);
+                startActivity(intent);
+            }
+        });
+
+        ImageView imageView2 = view.findViewById(R.id.imageView2);
+        imageView2.setOnClickListener(new View.OnClickListener(){
+
             @Override
             public void onClick(View view) {
                 Intent dbmanager = new Intent(getActivity(), AndroidDatabaseManager.class);
@@ -257,7 +307,7 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
         @Override
         public void onLocationResult(LocationResult locationResult) {
             for (Location location : locationResult.getLocations()) {
-                Log.i("MapsActivity", "Location: " + location.getLatitude() + " " + location.getLongitude());
+                Log.i("MapsActivityFirst", "Location: " + location.getLatitude() + " " + location.getLongitude());
                 mLastLocation = location;
                 currentLatitude = location.getLatitude();
                 currentLongitude = location.getLongitude();
@@ -267,6 +317,30 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
 
                 //move map camera
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 17));
+            }
+        }
+
+    };
+
+    LocationCallback updateLocationCallback = new LocationCallback() {
+        @Override
+        public void onLocationResult(LocationResult locationResult) {
+            for (Location location : locationResult.getLocations()) {
+                Log.i("MapsActivityUpdate", "Location: " + location.getLatitude() + " " + location.getLongitude());
+                mLastLocation = location;
+                currentLatitude = location.getLatitude();
+                currentLongitude = location.getLongitude();
+
+                LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 17));
+
+                beginLat = currentLatitude;
+                beginLng = currentLongitude;
+                beginMarker = mMap.addMarker(new MarkerOptions().position(new LatLng(currentLatitude, currentLongitude))
+                        .title("Begin")
+                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
+                );
             }
         }
 
@@ -288,9 +362,11 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
 
                 distanceText.setText(df2.format(metersToMiles(distance)));
 
+
                 dbHandler.addLocation(currentLatitude, currentLongitude, Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()));
                 //Toast.makeText(getActivity(), "Time: " + Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()) + " Distance: " + distance, Toast.LENGTH_SHORT).show();
-                createPolyLine();
+                //createPolyLine();
+                addPolyLine();
                 count++;
             }
         }
@@ -309,16 +385,52 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
 
     private void createPolyLine() {
         ArrayList<LatLng> path = dbHandler.getTotalPath();
+        Log.d("PATH", Integer.toString(path.size()));
+
         if (path.size() >= 2) {
             for(int i = 0; i<path.size()-1; i++){
                 line = mMap.addPolyline(new PolylineOptions().add(path.get(i), path.get(i+1)).width(5).color(Color.RED));
+                Log.d("ADD POLYLINE", "Attempted to add polyline " + "Path 1: " + path.get(i) + " Path 2: " + path.get(i+1));
             }
             //Log.d("PATH", "Path 1: " + path.get(0) + " Path 2: " + path.get(1));
         }
     }
 
+    private void calculateDistance(){
+        ArrayList<LatLng> path = dbHandler.getTotalPath();
+        if (path.size() >= 2) {
+            distance = 0;
+            for(int i = 0; i<path.size()-1; i++){
+                Location location1 = new Location("");
+                Location location2 = new Location("");
+                location1.setLatitude(path.get(i).latitude);
+                location1.setLongitude(path.get(i).longitude);
+                location2.setLatitude(path.get(i+1).latitude);
+                location2.setLongitude(path.get(i+1).longitude);
+                if (location1.distanceTo(location2) > 4.572) {
+                    distance += location1.distanceTo(location2);
+                }
+            }
+            //Log.d("PATH", "Path 1: " + path.get(0) + " Path 2: " + path.get(1));
+            distanceText.setText(df2.format(metersToMiles(distance)));
+        }
+    }
+
     public double metersToMiles(double meters) {
         return meters * 0.000621371;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        IntentFilter intentFilter = new IntentFilter("record_workout");
+        getActivity().registerReceiver(receiver,intentFilter);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        getActivity().unregisterReceiver(receiver);
     }
 
     @Override
@@ -350,11 +462,17 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
         return false;
     }
 
+    @SuppressLint("MissingPermission")
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
         //dbHandler.deleteAllLocation();
         setupMap();
+
+    }
+
+    private void startWorkoutService() {
+        getActivity().startService(new Intent(getActivity(), WorkoutService.class));
     }
 
     public void setupMap() {
@@ -372,17 +490,22 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
 
             mGoogleApiClient.connect();
 
+            if (endLat != 0 && endLng != 0 && !workoutMode) {
+                endMarker = mMap.addMarker(new MarkerOptions().position(new LatLng(endLat, endLng))
+                        .title("End"));
+            }
+
             if (beginLat != 0 && beginLng != 0) {
                 beginMarker = mMap.addMarker(new MarkerOptions().position(new LatLng(beginLat, beginLng))
                         .title("Begin")
                         .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
                 );
+                createPolyLine();
+                calculateDistance();
+            } else {
+                dbHandler.deleteAllLocation();
             }
 
-            if (endLat != 0 && endLng != 0) {
-                endMarker = mMap.addMarker(new MarkerOptions().position(new LatLng(endLat, endLng))
-                        .title("End"));
-            }
         }
     }
 
@@ -410,18 +533,15 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
                 chronometer.start();
                 mMap.clear();
 
-                beginLat = currentLatitude;
-                beginLng = currentLongitude;
-                beginMarker = mMap.addMarker(new MarkerOptions().position(new LatLng(currentLatitude, currentLongitude))
-                        .title("Begin")
-                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
-                );
+                LocationRequest getCurrentLocation = new LocationRequest();
+                getCurrentLocation.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+                mFusedLocationClient.requestLocationUpdates(getCurrentLocation, updateLocationCallback, Looper.myLooper());
 
                 mLocationRequestUpdate = new LocationRequest();
                 mLocationRequestUpdate.setInterval(15000); //5 seconds
                 mLocationRequestUpdate.setFastestInterval(10000); //3 seconds
                 mLocationRequestUpdate.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
-                mLocationRequest.setSmallestDisplacement(4.572F); //1/10 meter
+                mLocationRequestUpdate.setSmallestDisplacement(4.572F); //1/10 meter
                 mFusedLocationClient.requestLocationUpdates(mLocationRequestUpdate, mLocationCallbackUpdate, Looper.myLooper());
 
                 startWorkout.setText("Stop Workout");
@@ -437,13 +557,14 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
                 mFusedLocationClient.removeLocationUpdates(mLocationCallbackUpdate);
                 mFusedLocationClient.requestLocationUpdates(getLocation, mLocationCallbackUpdate, Looper.myLooper());
 
+
                 //Toast.makeText(getActivity(), "Time: " + Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()), Toast.LENGTH_SHORT).show();
 
                 endLat = currentLatitude;
                 endLng = currentLongitude;
                 endMarker = mMap.addMarker(new MarkerOptions().position(new LatLng(currentLatitude, currentLongitude))
                         .title("End"));
-
+                mFusedLocationClient.removeLocationUpdates(mLocationCallbackUpdate);
                 startWorkout.setText("Start Workout");
                 startWorkout.setBackgroundColor(getResources().getColor(R.color.colorPrimaryDark));
                 workoutMode = false;

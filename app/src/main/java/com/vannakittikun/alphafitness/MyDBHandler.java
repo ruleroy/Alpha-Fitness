@@ -12,6 +12,7 @@ import android.util.Log;
 import com.google.android.gms.maps.model.LatLng;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -20,15 +21,20 @@ import java.util.List;
 
 public class MyDBHandler extends SQLiteOpenHelper {
 
-    private static final int DATABASE_VERSION = 14;
+    private static final int DATABASE_VERSION = 17;
     private static final String DATABASE_NAME = "locationDB";
 
     public static final String TABLE_LOCATION = "location";
+    public static final String TABLE_USER = "user";
 
     public static final String COLUMN_ID = "_id";
     public static final String COLUMN_LAT = "lat";
     public static final String COLUMN_LNG = "lng";
     public static final String COLUMN_TIME = "time";
+
+    public static final String USER_NAME = "name";
+    public static final String USER_GENDER = "gender";
+    public static final String USER_WEIGHT = "weight";
 
     public MyDBHandler(Context context, String name, SQLiteDatabase.CursorFactory factory, int version) {
         super(context, DATABASE_NAME, factory, DATABASE_VERSION);
@@ -47,11 +53,23 @@ public class MyDBHandler extends SQLiteOpenHelper {
                 COLUMN_TIME + " TEXT" +
                 ");";
         sqLiteDatabase.execSQL(query);
+
+        String query2 = "CREATE TABLE " + TABLE_USER + "(" +
+                COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                USER_NAME + " TEXT," +
+                USER_GENDER + " TEXT," +
+                USER_WEIGHT + " INTEGER" +
+                ");";
+        sqLiteDatabase.execSQL(query2);
+
+        sqLiteDatabase.execSQL("INSERT INTO " + TABLE_USER + " (name, gender, weight) VALUES ('Name', 'Male', 160)");
+        //addUser("Name", "Male", 160);
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase sqLiteDatabase, int i, int i1) {
         sqLiteDatabase.execSQL("DROP TABLE IF EXISTS " + TABLE_LOCATION);
+        sqLiteDatabase.execSQL("DROP TABLE IF EXISTS " + TABLE_USER);
         onCreate(sqLiteDatabase);
     }
 
@@ -66,6 +84,44 @@ public class MyDBHandler extends SQLiteOpenHelper {
         db.insert(TABLE_LOCATION, null, values);
         db.close();
 
+    }
+
+    public void addUser(String name, String gender, int weight) {
+        SQLiteDatabase db = getWritableDatabase();
+
+        ContentValues values = new ContentValues();
+        values.put(USER_NAME, name);
+        values.put(USER_GENDER, gender);
+        values.put(USER_WEIGHT, weight);
+
+        db.insert(TABLE_USER, null, values);
+        db.close();
+
+    }
+
+    public void updateUser(int id, String name, String gender, int weight) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(USER_NAME, name);
+        values.put(USER_GENDER, gender);
+        values.put(USER_WEIGHT, weight);
+
+        db.update(TABLE_USER, values, "_id=" + Integer.toString(id), null);
+        db.close();
+    }
+
+    public User getUser(int id) {
+        User user = new User();
+
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT * FROM " + TABLE_USER + " WHERE " + COLUMN_ID + "=" + Integer.toString(id), null);
+        c.moveToFirst();
+        if (c.getString(c.getColumnIndex("_id")) != null) {
+            user.setName(c.getString(c.getColumnIndex(USER_NAME)));
+            user.setGender(c.getString(c.getColumnIndex(USER_GENDER)));
+            user.setWeight(c.getInt(c.getColumnIndex(USER_WEIGHT)));
+        }
+        return user;
     }
 
     public void deleteAllLocation() {

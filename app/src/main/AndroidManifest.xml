@@ -16,12 +16,22 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/HiddenTitleTheme">
-        <activity android:name=".RecordWorkoutActivity">
+        <activity
+            android:name=".RecordWorkoutActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+
+        <activity android:name=".UserProfileActivity"
+            android:label="User Profile"
+            android:theme="@style/ActionBarTheme"
+            android:screenOrientation="portrait">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value=".RecordWorkoutActivity" />
         </activity>
 
         <activity android:name=".AndroidDatabaseManager" />
