@@ -5,6 +5,7 @@ package com.vannakittikun.alphafitness;
  */
 
 public class User {
+    private int id;
     private String name;
     private String gender;
     private int weight;
@@ -17,6 +18,10 @@ public class User {
 
     public User(){
         super();
+    }
+
+    public void setId(int id){
+        this.id = id;
     }
 
     public void setName(String name){
@@ -41,5 +46,9 @@ public class User {
 
     public int getWeight(){
         return this.weight;
+    }
+
+    public int getId(){
+        return this.id;
     }
 }

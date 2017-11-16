@@ -3,9 +3,14 @@ package com.vannakittikun.alphafitness;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Service;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.os.Bundle;
@@ -35,41 +40,33 @@ import com.google.android.gms.maps.model.Polyline;
  * Created by Rule on 11/9/2017.
  */
 
-public class WorkoutService extends Service implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
-    Location mLastLocation;
-    MyDBHandler dbHandler;
-    final int MY_LOCATION_REQUEST_CODE = 1;
+public class WorkoutService extends Service implements SensorEventListener {
+    private MyDBHandler dbHandler;
 
-    LocationRequest mLocationRequest;
-    LocationRequest mLocationRequestUpdate;
-    GoogleApiClient mGoogleApiClient;
-    Marker beginMarker;
-    Marker endMarker;
-    FusedLocationProviderClient mFusedLocationClient;
-    Polyline line;
-    double currentLatitude;
-    double currentLongitude;
-    double distance = 0;
+    private SensorManager mSensorManager;
+    private Sensor mStepCounterSensor;
+    private Sensor mStepDetectorSensor;
+
+    private int stepCounter = 0;
+    private int counterSteps = 0;
+    private final static long MICROSECONDS_IN_ONE_MINUTE = 60000000;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        buildGoogleApiClient();
-        Log.d("HEEEEEEEY", "FOUND U BRUH");
+        mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        mStepCounterSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
+        mStepDetectorSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR);
     }
 
-    protected synchronized void buildGoogleApiClient() {
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .addApi(LocationServices.API)
-                .build();
-    }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        mGoogleApiClient.connect();
         dbHandler = new MyDBHandler(this.getApplicationContext(), null, null, 1);
+        stepCounter = dbHandler.getWeeklySteps(1);
+
+        mSensorManager.registerListener(this, mStepCounterSensor, SensorManager.SENSOR_DELAY_NORMAL, (int) (5* MICROSECONDS_IN_ONE_MINUTE));
+        mSensorManager.registerListener(this, mStepDetectorSensor, SensorManager.SENSOR_DELAY_NORMAL);
 
         return super.onStartCommand(intent, flags, startId);
     }
@@ -81,111 +78,19 @@ public class WorkoutService extends Service implements GoogleApiClient.Connectio
     }
 
     @Override
-    public void onLocationChanged(Location location) {
+    public void onSensorChanged(SensorEvent sensorEvent) {
+        stepCounter++;
+        dbHandler.updateWeeklySteps(1, stepCounter);
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int i) {
 
     }
 
     @Override
-    public void onStatusChanged(String s, int i, Bundle bundle) {
-
-    }
-
-    @Override
-    public void onProviderEnabled(String s) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String s) {
-
-    }
-
-    @SuppressLint("MissingPermission")
-    @Override
-    public void onConnected(@Nullable Bundle bundle) {
-        mLocationRequest = new LocationRequest();
-        //mLocationRequest.setInterval(5000); //5 seconds
-        //mLocationRequest.setFastestInterval(3000); //3 seconds
-        mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
-        //mLocationRequest.setSmallestDisplacement(0.1F); //1/10 meter
-        mFusedLocationClient.requestLocationUpdates(mLocationRequest, firstLocationCallback, Looper.myLooper());
-    }
-
-    LocationCallback firstLocationCallback = new LocationCallback() {
-        @Override
-        public void onLocationResult(LocationResult locationResult) {
-            for (Location location : locationResult.getLocations()) {
-                Log.i("MapsActivity", "Location: " + location.getLatitude() + " " + location.getLongitude());
-                mLastLocation = location;
-                currentLatitude = location.getLatitude();
-                currentLongitude = location.getLongitude();
-
-                //Place current location marker
-                LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-
-                Bundle args = new Bundle();
-                args.putParcelable("bundleLatLng", latLng);
-
-                Intent intent = new Intent();
-                intent.putExtra("latLng", args);
-                sendBroadcast(intent);
-                //move map camera
-                //mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 17));
-            }
-        }
-
-    };
-
-    /*
-    LocationCallback mLocationCallbackUpdate = new LocationCallback() {
-        @Override
-        public void onLocationResult(LocationResult locationResult) {
-            for (Location location : locationResult.getLocations()) {
-                Log.i("MapsActivity", "Location: " + location.getLatitude() + " " + location.getLongitude());
-
-                if (mLastLocation.distanceTo(location) > 4.572 && count > 0) {
-                    distance += mLastLocation.distanceTo(location);
-                }
-
-                mLastLocation = location;
-                currentLatitude = location.getLatitude();
-                currentLongitude = location.getLongitude();
-
-                Intent intent = new Intent("record_workout");
-                intent.putExtra("update", stepCounter);
-                sendBroadcast();
-                distanceText.setText(df2.format(metersToMiles(distance)));
-
-                dbHandler.addLocation(currentLatitude, currentLongitude, Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()));
-                //Toast.makeText(getActivity(), "Time: " + Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()) + " Distance: " + distance, Toast.LENGTH_SHORT).show();
-                createPolyLine();
-                count++;
-            }
-        }
-
-    };
-    */
-
-    @Override
-    public void onConnectionSuspended(int i) {
-
-    }
-
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-        AlertDialog.Builder builder1 = new AlertDialog.Builder(this.getApplicationContext());
-        builder1.setMessage("Failed to connect");
-        builder1.setCancelable(false);
-
-        builder1.setPositiveButton(
-                "OK",
-                new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        System.exit(0);
-                    }
-                });
-
-        AlertDialog alert11 = builder1.create();
-        alert11.show();
+    public void onDestroy(){
+        super.onDestroy();
+        mSensorManager.unregisterListener(this);
     }
 }

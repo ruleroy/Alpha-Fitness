@@ -21,11 +21,12 @@ import java.util.List;
 
 public class MyDBHandler extends SQLiteOpenHelper {
 
-    private static final int DATABASE_VERSION = 17;
+    private static final int DATABASE_VERSION = 21;
     private static final String DATABASE_NAME = "locationDB";
 
     public static final String TABLE_LOCATION = "location";
     public static final String TABLE_USER = "user";
+    public static final String TABLE_DETAILS = "details";
 
     public static final String COLUMN_ID = "_id";
     public static final String COLUMN_LAT = "lat";
@@ -35,6 +36,12 @@ public class MyDBHandler extends SQLiteOpenHelper {
     public static final String USER_NAME = "name";
     public static final String USER_GENDER = "gender";
     public static final String USER_WEIGHT = "weight";
+
+    public static final String DETAILS_AVG_DIST = "avgDist";
+    public static final String DETAILS_AVG_STEPS = "avgSteps";
+    public static final String DETAILS_AVG_TIME = "avgTime";
+    public static final String DETAILS_AVG_WORKOUTS = "avgWorkouts";
+    public static final String DETAILS_AVG_CALORIES_BURNED = "avgCaloriesBurned";
 
     public MyDBHandler(Context context, String name, SQLiteDatabase.CursorFactory factory, int version) {
         super(context, DATABASE_NAME, factory, DATABASE_VERSION);
@@ -64,17 +71,28 @@ public class MyDBHandler extends SQLiteOpenHelper {
 
         sqLiteDatabase.execSQL("INSERT INTO " + TABLE_USER + " (name, gender, weight) VALUES ('Name', 'Male', 160)");
         //addUser("Name", "Male", 160);
+
+        String query3 = "CREATE TABLE " + TABLE_DETAILS + "(" +
+                COLUMN_ID + " INTEGER PRIMARY KEY," +
+                DETAILS_AVG_DIST + " INTEGER," +
+                DETAILS_AVG_STEPS + " INTEGER," +
+                DETAILS_AVG_TIME + " INTEGER," +
+                DETAILS_AVG_WORKOUTS + " INTEGER," +
+                DETAILS_AVG_CALORIES_BURNED + " INTEGER" +
+                ");";
+        sqLiteDatabase.execSQL(query3);
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase sqLiteDatabase, int i, int i1) {
         sqLiteDatabase.execSQL("DROP TABLE IF EXISTS " + TABLE_LOCATION);
         sqLiteDatabase.execSQL("DROP TABLE IF EXISTS " + TABLE_USER);
+        sqLiteDatabase.execSQL("DROP TABLE IF EXISTS " + TABLE_DETAILS);
         onCreate(sqLiteDatabase);
     }
 
     public void addLocation(double lat, double lng, long time) {
-        SQLiteDatabase db = getWritableDatabase();
+        SQLiteDatabase db = this.getWritableDatabase();
 
         ContentValues values = new ContentValues();
         values.put(COLUMN_LAT, lat);
@@ -82,7 +100,7 @@ public class MyDBHandler extends SQLiteOpenHelper {
         values.put(COLUMN_TIME, time);
 
         db.insert(TABLE_LOCATION, null, values);
-        db.close();
+        //db.close();
 
     }
 
@@ -95,19 +113,136 @@ public class MyDBHandler extends SQLiteOpenHelper {
         values.put(USER_WEIGHT, weight);
 
         db.insert(TABLE_USER, null, values);
-        db.close();
+        //db.close();
 
     }
 
     public void updateUser(int id, String name, String gender, int weight) {
-        SQLiteDatabase db = getWritableDatabase();
+        SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put(USER_NAME, name);
         values.put(USER_GENDER, gender);
         values.put(USER_WEIGHT, weight);
 
         db.update(TABLE_USER, values, "_id=" + Integer.toString(id), null);
-        db.close();
+        //db.close();
+    }
+
+    public void updateUserDetails(int id, double dist, long time, int workouts, int cals) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(COLUMN_ID, id);
+        values.put(DETAILS_AVG_DIST, dist);
+        values.put(DETAILS_AVG_TIME, time);
+        values.put(DETAILS_AVG_WORKOUTS, workouts);
+        values.put(DETAILS_AVG_CALORIES_BURNED, cals);
+
+        if(userExists(id)) {
+            Log.d("DBUPDATE", "updated");
+            db.update(TABLE_DETAILS, values, "_id=" + Integer.toString(id), null);
+        } else {
+            db.insert(TABLE_DETAILS, null, values);
+            Log.d("DBINSERT", "inserted");
+        }
+
+        //db.close();
+    }
+
+    public int getWeeklyWorkouts(int id) {
+        int workouts = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT * FROM " + TABLE_DETAILS + " WHERE " + COLUMN_ID + "=" + Integer.toString(id), null);
+        c.moveToFirst();
+        if (c.getCount() > 0) {
+            workouts = c.getInt(c.getColumnIndex(DETAILS_AVG_WORKOUTS));
+        }
+        c.close();
+        //db.close();
+        return workouts;
+    }
+
+    public double getWeeklyDistance(int id) {
+        double distance = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT * FROM " + TABLE_DETAILS + " WHERE " + COLUMN_ID + "=" + Integer.toString(id), null);
+        c.moveToFirst();
+        if (c.getCount() > 0) {
+            distance = c.getDouble(c.getColumnIndex(DETAILS_AVG_DIST));
+        }
+        c.close();
+        //db.close();
+        return distance;
+    }
+
+    public long getWeeklyTime(int id) {
+        long time = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT * FROM " + TABLE_DETAILS + " WHERE " + COLUMN_ID + "=" + Integer.toString(id), null);
+        c.moveToFirst();
+        if (c.getCount() > 0) {
+            time = c.getLong(c.getColumnIndex(DETAILS_AVG_TIME));
+        }
+        c.close();
+        //db.close();
+        return time;
+    }
+
+    public void updateWeeklyTime(int id, long time) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(COLUMN_ID, id);
+        values.put(DETAILS_AVG_TIME, time);
+
+        if(userExists(id)) {
+            Log.d("DBUPDATE", "updated");
+            db.update(TABLE_DETAILS, values, "_id=" + Integer.toString(id), null);
+        } else {
+            db.insert(TABLE_DETAILS, null, values);
+            Log.d("DBINSERT", "inserted");
+        }
+        //db.close();
+    }
+
+    public void updateWeeklySteps(int id, int steps) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(COLUMN_ID, id);
+        values.put(DETAILS_AVG_STEPS, steps);
+
+        if(userExists(id)) {
+            //Log.d("DBUPDATE", "updated");
+            db.update(TABLE_DETAILS, values, "_id=" + Integer.toString(id), null);
+        } else {
+            db.insert(TABLE_DETAILS, null, values);
+            //Log.d("DBINSERT", "inserted");
+        }
+        //db.close();
+    }
+
+    public int getWeeklySteps(int id) {
+        int steps = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT * FROM " + TABLE_DETAILS + " WHERE " + COLUMN_ID + "=" + Integer.toString(id), null);
+        c.moveToFirst();
+        if (c.getCount() > 0) {
+            steps = c.getInt(c.getColumnIndex(DETAILS_AVG_STEPS));
+        }
+        c.close();
+        //db.close();
+        return steps;
+    }
+
+    public boolean userExists(int id) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        String Query = "SELECT * FROM " + TABLE_DETAILS + " WHERE " + COLUMN_ID + "=\"" + id + "\";";
+        Cursor cursor = db.rawQuery(Query, null);
+        if (cursor.getCount() <= 0) {
+            cursor.close();
+            return false;
+        }
+        cursor.close();
+        //db.close();
+        return true;
     }
 
     public User getUser(int id) {
@@ -117,18 +252,21 @@ public class MyDBHandler extends SQLiteOpenHelper {
         Cursor c = db.rawQuery("SELECT * FROM " + TABLE_USER + " WHERE " + COLUMN_ID + "=" + Integer.toString(id), null);
         c.moveToFirst();
         if (c.getString(c.getColumnIndex("_id")) != null) {
+            user.setId(c.getInt(c.getColumnIndex(COLUMN_ID)));
             user.setName(c.getString(c.getColumnIndex(USER_NAME)));
             user.setGender(c.getString(c.getColumnIndex(USER_GENDER)));
             user.setWeight(c.getInt(c.getColumnIndex(USER_WEIGHT)));
         }
+        c.close();
+        //db.close();
         return user;
     }
 
     public void deleteAllLocation() {
-        SQLiteDatabase db = getWritableDatabase();
+        SQLiteDatabase db = this.getWritableDatabase();
         db.execSQL("UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='" + TABLE_LOCATION + "'");
         db.execSQL("DELETE FROM " + TABLE_LOCATION);
-        db.close();
+        //db.close();
     }
 
     public ArrayList<LatLng> getLastWorkoutPath() {
@@ -145,7 +283,7 @@ public class MyDBHandler extends SQLiteOpenHelper {
                 c.moveToPrevious();
             }
         }
-        db.close();
+        //db.close();
         c.close();
         return result;
     }
@@ -162,14 +300,14 @@ public class MyDBHandler extends SQLiteOpenHelper {
             }
             c.moveToNext();
         }
-        db.close();
+        //db.close();
         c.close();
         return result;
     }
 
     public ArrayList<LocationObject> getSavedLocations() {
         ArrayList<LocationObject> locations = new ArrayList<LocationObject>();
-        SQLiteDatabase db = getWritableDatabase();
+        SQLiteDatabase db = this.getWritableDatabase();
         String Query = "SELECT * FROM " + TABLE_LOCATION + ";";
         Cursor c = db.rawQuery(Query, null);
         c.moveToFirst();
@@ -180,7 +318,7 @@ public class MyDBHandler extends SQLiteOpenHelper {
             }
             c.moveToNext();
         }
-        db.close();
+        //db.close();
         c.close();
         return locations;
     }

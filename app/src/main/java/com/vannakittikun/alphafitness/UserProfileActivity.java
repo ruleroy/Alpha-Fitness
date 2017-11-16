@@ -1,5 +1,7 @@
 package com.vannakittikun.alphafitness;
 
+import android.app.Activity;
+import android.content.Context;
 import android.os.Bundle;
 import android.support.v4.app.NavUtils;
 import android.support.v7.app.AppCompatActivity;
@@ -10,6 +12,7 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.EditText;
 import android.widget.Spinner;
@@ -17,7 +20,9 @@ import android.widget.TextView;
 
 import org.w3c.dom.Text;
 
+import java.text.DecimalFormat;
 import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by Rule on 11/13/2017.
@@ -35,7 +40,14 @@ public class UserProfileActivity extends AppCompatActivity{
     private Spinner genderSpinner;
     private EditText weightEdit;
 
+    private TextView weeklyDistanceText;
+    private TextView weeklyWorkoutsText;
+    private TextView weeklyTimeText;
+
     private boolean editMode;
+    private DecimalFormat df;
+    Thread t;
+
 
 
     @Override
@@ -44,11 +56,51 @@ public class UserProfileActivity extends AppCompatActivity{
         setContentView(R.layout.activity_user_profile);
 
         getSupportActionBar().setHomeButtonEnabled(true);
+        df = new DecimalFormat("#.###");
 
         dbHandler = new MyDBHandler(this, null, null, 1);
         genderSpinner = findViewById(R.id.genderSpinner);
 
         user = dbHandler.getUser(1);
+
+        //RecordWorkoutPortrait.weeklyDistance = dbHandler.getWeeklyDistance(user.getId());
+        //RecordWorkoutPortrait.weeklyWorkouts = dbHandler.getWeeklyWorkouts(user.getId());
+        //RecordWorkoutPortrait.weeklyTime = dbHandler.getWeeklyTime(user.getId());
+
+        weeklyDistanceText = findViewById(R.id.weeklyDistanceText);
+        weeklyDistanceText.setText(df.format(metersToMiles(RecordWorkoutPortrait.weeklyDistance)) + " mi.");
+        weeklyWorkoutsText = findViewById(R.id.weeklyWorkoutsText);
+        weeklyWorkoutsText.setText(RecordWorkoutPortrait.weeklyWorkouts + " time(s)");
+        weeklyTimeText = findViewById(R.id.weeklyTimeText);
+        weeklyTimeText.setText(getDurationBreakdown(RecordWorkoutPortrait.weeklyTime));
+
+        t = new Thread() {
+
+            @Override
+            public void run() {
+                try {
+                    while (!isInterrupted()) {
+                        Thread.sleep(1000);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                weeklyDistanceText.setText(df.format(metersToMiles(RecordWorkoutPortrait.weeklyDistance)) + " mi.");
+                                weeklyWorkoutsText.setText(RecordWorkoutPortrait.weeklyWorkouts + " time(s)");
+                                if(RecordWorkoutPortrait.workoutMode) {
+                                    RecordWorkoutPortrait.weeklyTime += 1000;
+                                }
+                                weeklyTimeText.setText(getDurationBreakdown(RecordWorkoutPortrait.weeklyTime));
+                                Log.d("UpdateDetails", "Updating textviews");
+                            }
+                        });
+                    }
+                } catch (InterruptedException e) {
+                }
+            }
+        };
+
+        t.start();
+
         nameText = findViewById(R.id.nameText);
         weightText = findViewById(R.id.weightText);
         genderText = findViewById(R.id.genderText);
@@ -117,6 +169,46 @@ public class UserProfileActivity extends AppCompatActivity{
     }
 
     @Override
+    public void onDestroy(){
+        super.onDestroy();
+        t.interrupt();
+    }
+
+    /**
+     * Convert a millisecond duration to a string format
+     *
+     * @param millis A duration to convert to a string form
+     * @return A string of the form "X Days Y Hours Z Minutes A Seconds".
+     */
+    public static String getDurationBreakdown(long millis)
+    {
+        if(millis < 0)
+        {
+            throw new IllegalArgumentException("Duration must be greater than zero!");
+        }
+
+        long days = TimeUnit.MILLISECONDS.toDays(millis);
+        long hours = TimeUnit.MILLISECONDS.toHours(millis) % 24;
+        long minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % 60;
+        long seconds = TimeUnit.MILLISECONDS.toSeconds(millis) % 60;
+        long milliseconds = millis % 1000;
+
+        return String.format("%d Days %d Hrs %d Mins %d Secs", days, hours, minutes, seconds);
+    }
+
+    public double metersToMiles(double meters) {
+        return meters * 0.000621371;
+    }
+
+    public static void hideKeyboard(Activity activity) {
+        View view = activity.findViewById(android.R.id.content);
+        if (view != null) {
+            InputMethodManager imm = (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+        }
+    }
+
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.menu_user_profile, menu); //inflate our menu
@@ -137,6 +229,7 @@ public class UserProfileActivity extends AppCompatActivity{
                     item.setTitle("Save");
                 } else {
                     item.setTitle("Edit");
+                    hideKeyboard(this);
                 }
                 return true;
 

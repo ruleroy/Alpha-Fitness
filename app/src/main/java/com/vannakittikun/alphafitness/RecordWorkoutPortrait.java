@@ -15,16 +15,13 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
-import android.location.Location;
 import android.os.Looper;
-import android.os.Parcelable;
 import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.constraint.ConstraintLayout;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AlertDialog;
-import android.text.format.DateFormat;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -49,12 +46,10 @@ import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
-import com.google.android.gms.tasks.Task;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -85,8 +80,13 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
 
     double currentLatitude;
     double currentLongitude;
-    boolean workoutMode;
+    public static boolean workoutMode;
     int count;
+
+    public static double weeklyDistance;
+    public static long weeklyTime;
+    public static int weeklyWorkouts;
+    public static int weeklySteps;
 
     double beginLat = 0;
     double beginLng = 0;
@@ -184,10 +184,26 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(getActivity());
 
         dbHandler = new MyDBHandler(getActivity(), null, null, 1);
+        weeklyWorkouts = dbHandler.getWeeklyWorkouts(1);
+        weeklyDistance = dbHandler.getWeeklyDistance(1);
+        weeklyTime = dbHandler.getWeeklyTime(1);
+
         parentView = getActivity().findViewById(R.id.parentView);
         chronometer = getActivity().findViewById(R.id.chronometer);
-        distanceText = getActivity().findViewById(R.id.distanceText);
+        distanceText = getActivity().findViewById(R.id.weeklyDistanceText);
         startWorkout = getActivity().findViewById(R.id.startWorkout);
+
+        chronometer.setOnChronometerTickListener(new Chronometer.OnChronometerTickListener()
+        {
+            @Override
+            public void onChronometerTick(Chronometer chronometer)
+            {
+                weeklyTime = weeklyTime + 1000;
+                dbHandler.updateWeeklyTime(1, weeklyTime);
+                Log.d("WeeklyTime", Long.toString(weeklyTime));
+            }
+        });
+
 
         df2 = new DecimalFormat("#.###");
 
@@ -231,6 +247,7 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
         MapFragment mapFragment = (MapFragment) getChildFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
 
+
         startWorkout = view.findViewById(R.id.startWorkout);
         startWorkout.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -243,6 +260,7 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
         imageButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                dbHandler.updateUserDetails(1, weeklyDistance, weeklyTime, weeklyWorkouts, 100);
                 Intent intent = new Intent(getActivity(), UserProfileActivity.class);
                 startActivity(intent);
             }
@@ -354,6 +372,7 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
 
                 if (mLastLocation.distanceTo(location) > 4.572 && count > 0) {
                     distance += mLastLocation.distanceTo(location);
+                    weeklyDistance += distance;
                 }
 
                 mLastLocation = location;
@@ -364,6 +383,7 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
 
 
                 dbHandler.addLocation(currentLatitude, currentLongitude, Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()));
+                dbHandler.updateUserDetails(1, weeklyDistance, weeklyTime, weeklyWorkouts, 100);
                 //Toast.makeText(getActivity(), "Time: " + Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()) + " Distance: " + distance, Toast.LENGTH_SHORT).show();
                 //createPolyLine();
                 addPolyLine();
@@ -530,6 +550,7 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
                 distance = 0;
                 stopTime = 0;
                 count = 0;
+                weeklyWorkouts++;
                 chronometer.start();
                 mMap.clear();
 
@@ -565,6 +586,7 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
                 endMarker = mMap.addMarker(new MarkerOptions().position(new LatLng(currentLatitude, currentLongitude))
                         .title("End"));
                 mFusedLocationClient.removeLocationUpdates(mLocationCallbackUpdate);
+                dbHandler.updateUserDetails(1, weeklyDistance, weeklyTime, weeklyWorkouts, 100);
                 startWorkout.setText("Start Workout");
                 startWorkout.setBackgroundColor(getResources().getColor(R.color.colorPrimaryDark));
                 workoutMode = false;
