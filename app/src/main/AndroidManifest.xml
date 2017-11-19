@@ -35,6 +35,11 @@
         </activity>
 
         <activity android:name=".AndroidDatabaseManager" />
+        <service
+            android:name=".WorkoutService"
+            android:label="Workout Service" >
+        </service>
+
 
         <!--
              The API key for Google Maps-based APIs is defined as a string resource.

@@ -21,7 +21,7 @@ import java.util.List;
 
 public class MyDBHandler extends SQLiteOpenHelper {
 
-    private static final int DATABASE_VERSION = 21;
+    private static final int DATABASE_VERSION = 25;
     private static final String DATABASE_NAME = "locationDB";
 
     public static final String TABLE_LOCATION = "location";
@@ -37,6 +37,7 @@ public class MyDBHandler extends SQLiteOpenHelper {
     public static final String USER_GENDER = "gender";
     public static final String USER_WEIGHT = "weight";
 
+    public static final String DETAILS_USER_ID = "userID";
     public static final String DETAILS_AVG_DIST = "avgDist";
     public static final String DETAILS_AVG_STEPS = "avgSteps";
     public static final String DETAILS_AVG_TIME = "avgTime";
@@ -73,12 +74,13 @@ public class MyDBHandler extends SQLiteOpenHelper {
         //addUser("Name", "Male", 160);
 
         String query3 = "CREATE TABLE " + TABLE_DETAILS + "(" +
-                COLUMN_ID + " INTEGER PRIMARY KEY," +
-                DETAILS_AVG_DIST + " INTEGER," +
-                DETAILS_AVG_STEPS + " INTEGER," +
-                DETAILS_AVG_TIME + " INTEGER," +
-                DETAILS_AVG_WORKOUTS + " INTEGER," +
-                DETAILS_AVG_CALORIES_BURNED + " INTEGER" +
+                COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                DETAILS_USER_ID + " INTEGER," +
+                DETAILS_AVG_DIST + " INTEGER DEFAULT 0," +
+                DETAILS_AVG_STEPS + " INTEGER DEFAULT 0," +
+                DETAILS_AVG_TIME + " INTEGER DEFAULT 0," +
+                DETAILS_AVG_WORKOUTS + " INTEGER DEFAULT 0," +
+                DETAILS_AVG_CALORIES_BURNED + " INTEGER DEFAULT 0" +
                 ");";
         sqLiteDatabase.execSQL(query3);
     }
@@ -128,59 +130,140 @@ public class MyDBHandler extends SQLiteOpenHelper {
         //db.close();
     }
 
-    public void updateUserDetails(int id, double dist, long time, int workouts, int cals) {
+    public void newUserDetailsSession(int userid) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
-        values.put(COLUMN_ID, id);
+        values.put(DETAILS_USER_ID, userid);
+
+        if(userExists(userid)) {
+            Log.d("TABLEUPDATE", "INSERT NEW USER DETAILS");
+            db.insert(TABLE_DETAILS, null, values);
+        } else {
+
+        }
+
+        //db.close();
+    }
+
+    public int getCurrentSessionID(){
+        int session = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT * FROM " + TABLE_DETAILS, null);
+        c.moveToLast();
+        if (c.getCount() > 0) {
+            session = c.getInt(c.getColumnIndex(COLUMN_ID));
+        }
+        return session;
+    }
+
+    public void updateUserDetails(int id, int userid, double dist, int steps, long time, int workouts, int cals) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        //values.put(COLUMN_ID, id);
+        values.put(DETAILS_USER_ID, userid);
         values.put(DETAILS_AVG_DIST, dist);
+        values.put(DETAILS_AVG_STEPS, steps);
         values.put(DETAILS_AVG_TIME, time);
         values.put(DETAILS_AVG_WORKOUTS, workouts);
         values.put(DETAILS_AVG_CALORIES_BURNED, cals);
 
-        if(userExists(id)) {
-            Log.d("DBUPDATE", "updated");
+        if(userExists(userid)) {
+            //Log.d("DBUPDATE", "updated");
             db.update(TABLE_DETAILS, values, "_id=" + Integer.toString(id), null);
         } else {
-            db.insert(TABLE_DETAILS, null, values);
-            Log.d("DBINSERT", "inserted");
+            //db.insert(TABLE_DETAILS, null, values);
+            //Log.d("DBINSERT", "inserted");
         }
 
         //db.close();
     }
 
-    public int getWeeklyWorkouts(int id) {
-        int workouts = 0;
-        SQLiteDatabase db = this.getWritableDatabase();
-        Cursor c = db.rawQuery("SELECT * FROM " + TABLE_DETAILS + " WHERE " + COLUMN_ID + "=" + Integer.toString(id), null);
-        c.moveToFirst();
-        if (c.getCount() > 0) {
-            workouts = c.getInt(c.getColumnIndex(DETAILS_AVG_WORKOUTS));
-        }
-        c.close();
-        //db.close();
-        return workouts;
-    }
-
-    public double getWeeklyDistance(int id) {
+    public double getAllTimeDistance(int userid) {
         double distance = 0;
         SQLiteDatabase db = this.getWritableDatabase();
-        Cursor c = db.rawQuery("SELECT * FROM " + TABLE_DETAILS + " WHERE " + COLUMN_ID + "=" + Integer.toString(id), null);
+        Cursor c = db.rawQuery("SELECT SUM(" + DETAILS_AVG_DIST + ")" + " FROM " + TABLE_DETAILS + " WHERE " + DETAILS_USER_ID + "=" + Integer.toString(userid), null);
         c.moveToFirst();
         if (c.getCount() > 0) {
-            distance = c.getDouble(c.getColumnIndex(DETAILS_AVG_DIST));
+            distance = c.getDouble(0);
         }
         c.close();
         //db.close();
         return distance;
     }
 
-    public long getWeeklyTime(int id) {
-        long time = 0;
+    public int getAllTimeSteps(int userid) {
+        int steps = 0;
         SQLiteDatabase db = this.getWritableDatabase();
-        Cursor c = db.rawQuery("SELECT * FROM " + TABLE_DETAILS + " WHERE " + COLUMN_ID + "=" + Integer.toString(id), null);
+        Cursor c = db.rawQuery("SELECT SUM(" + DETAILS_AVG_STEPS + ")" + " FROM " + TABLE_DETAILS + " WHERE " + DETAILS_USER_ID + "=" + Integer.toString(userid), null);
         c.moveToFirst();
         if (c.getCount() > 0) {
-            time = c.getLong(c.getColumnIndex(DETAILS_AVG_TIME));
+            steps = c.getInt(0);
+        }
+        c.close();
+        //db.close();
+        return steps;
+    }
+
+    public long getAllTimeTime(int userid) {
+        long time = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT SUM(" + DETAILS_AVG_TIME + ")" + " FROM " + TABLE_DETAILS + " WHERE " + DETAILS_USER_ID + "=" + Integer.toString(userid), null);
+        c.moveToFirst();
+        if (c.getCount() > 0) {
+            time = c.getLong(0);
+        }
+        c.close();
+        //db.close();
+        return time;
+    }
+
+    public int getAllTimeWorkouts(int userid) {
+        int steps = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT COUNT(*)" + " FROM " + TABLE_DETAILS + " WHERE " + DETAILS_USER_ID + "=" + Integer.toString(userid), null);
+        c.moveToFirst();
+        if (c.getCount() > 0) {
+            steps = c.getInt(0);
+        }
+        c.close();
+        //db.close();
+        return steps;
+    }
+
+    public int getWeeklyWorkouts(int userid) {
+        int workouts = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT COUNT(*)" + " FROM " + TABLE_DETAILS + " WHERE " + DETAILS_USER_ID + "=" + Integer.toString(userid), null);
+        c.moveToFirst();
+        if (c.getCount() > 0) {
+            //Log.d("WEEKLY", Double.toString(c.getDouble(0)/7));
+            workouts = (int) Math.ceil(c.getDouble(0)/7);
+        }
+        c.close();
+        //db.close();
+        return workouts;
+    }
+
+    public double getWeeklyDistance(int userid) {
+        double distance = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT SUM(" + DETAILS_AVG_DIST + ")" + " FROM " + TABLE_DETAILS + " WHERE " + DETAILS_USER_ID + "=" + Integer.toString(userid), null);
+        c.moveToFirst();
+        if (c.getCount() > 0) {
+            distance = c.getDouble(0)/7;
+        }
+        c.close();
+        //db.close();
+        return distance;
+    }
+
+    public long getWeeklyTime(int userid) {
+        long time = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT AVG("+ DETAILS_AVG_TIME + ") FROM " + TABLE_DETAILS + " WHERE " + DETAILS_USER_ID + "=" + Integer.toString(userid), null);
+        c.moveToFirst();
+        if (c.getCount() > 0) {
+            time = c.getLong(0);
         }
         c.close();
         //db.close();
@@ -190,16 +273,9 @@ public class MyDBHandler extends SQLiteOpenHelper {
     public void updateWeeklyTime(int id, long time) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
-        values.put(COLUMN_ID, id);
         values.put(DETAILS_AVG_TIME, time);
 
-        if(userExists(id)) {
-            Log.d("DBUPDATE", "updated");
             db.update(TABLE_DETAILS, values, "_id=" + Integer.toString(id), null);
-        } else {
-            db.insert(TABLE_DETAILS, null, values);
-            Log.d("DBINSERT", "inserted");
-        }
         //db.close();
     }
 
@@ -209,17 +285,25 @@ public class MyDBHandler extends SQLiteOpenHelper {
         values.put(COLUMN_ID, id);
         values.put(DETAILS_AVG_STEPS, steps);
 
-        if(userExists(id)) {
-            //Log.d("DBUPDATE", "updated");
             db.update(TABLE_DETAILS, values, "_id=" + Integer.toString(id), null);
-        } else {
-            db.insert(TABLE_DETAILS, null, values);
-            //Log.d("DBINSERT", "inserted");
-        }
+
         //db.close();
     }
 
-    public int getWeeklySteps(int id) {
+    public int getWeeklySteps(int userid) {
+        int steps = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT AVG("+ DETAILS_AVG_STEPS + ") FROM " + TABLE_DETAILS + " WHERE " + DETAILS_USER_ID + "=" + Integer.toString(userid), null);
+        c.moveToFirst();
+        if (c.getCount() > 0) {
+            steps = c.getInt(0);
+        }
+        c.close();
+        //db.close();
+        return steps;
+    }
+
+    public int getCurrentSessionSteps(int id){
         int steps = 0;
         SQLiteDatabase db = this.getWritableDatabase();
         Cursor c = db.rawQuery("SELECT * FROM " + TABLE_DETAILS + " WHERE " + COLUMN_ID + "=" + Integer.toString(id), null);
@@ -234,7 +318,7 @@ public class MyDBHandler extends SQLiteOpenHelper {
 
     public boolean userExists(int id) {
         SQLiteDatabase db = this.getWritableDatabase();
-        String Query = "SELECT * FROM " + TABLE_DETAILS + " WHERE " + COLUMN_ID + "=\"" + id + "\";";
+        String Query = "SELECT * FROM " + TABLE_USER + " WHERE " + COLUMN_ID + "=\"" + id + "\";";
         Cursor cursor = db.rawQuery(Query, null);
         if (cursor.getCount() <= 0) {
             cursor.close();

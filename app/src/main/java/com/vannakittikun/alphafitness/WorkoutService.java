@@ -48,12 +48,13 @@ public class WorkoutService extends Service implements SensorEventListener {
     private Sensor mStepDetectorSensor;
 
     private int stepCounter = 0;
-    private int counterSteps = 0;
+    private int currentSessionID = 0;
     private final static long MICROSECONDS_IN_ONE_MINUTE = 60000000;
 
     @Override
     public void onCreate() {
         super.onCreate();
+        Log.d("WORKOUT_SERVICE", "Service started");
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         mStepCounterSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
         mStepDetectorSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR);
@@ -64,10 +65,11 @@ public class WorkoutService extends Service implements SensorEventListener {
     public int onStartCommand(Intent intent, int flags, int startId) {
         dbHandler = new MyDBHandler(this.getApplicationContext(), null, null, 1);
         stepCounter = dbHandler.getWeeklySteps(1);
+        currentSessionID = dbHandler.getCurrentSessionID();
 
         mSensorManager.registerListener(this, mStepCounterSensor, SensorManager.SENSOR_DELAY_NORMAL, (int) (5* MICROSECONDS_IN_ONE_MINUTE));
         mSensorManager.registerListener(this, mStepDetectorSensor, SensorManager.SENSOR_DELAY_NORMAL);
-
+        Log.d("WORKOUT_SERVICE", "Service started");
         return super.onStartCommand(intent, flags, startId);
     }
 
@@ -80,7 +82,8 @@ public class WorkoutService extends Service implements SensorEventListener {
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
         stepCounter++;
-        dbHandler.updateWeeklySteps(1, stepCounter);
+        dbHandler.updateWeeklySteps(currentSessionID, stepCounter);
+        Log.d("WORKOUT_SERVICE", "STEP DETECTED " + stepCounter);
     }
 
     @Override

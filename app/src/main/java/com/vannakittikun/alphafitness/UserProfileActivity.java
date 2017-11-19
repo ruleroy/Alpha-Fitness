@@ -3,7 +3,6 @@ package com.vannakittikun.alphafitness;
 import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
-import android.support.v4.app.NavUtils;
 import android.support.v7.app.AppCompatActivity;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -21,7 +20,6 @@ import android.widget.TextView;
 import org.w3c.dom.Text;
 
 import java.text.DecimalFormat;
-import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -43,6 +41,15 @@ public class UserProfileActivity extends AppCompatActivity{
     private TextView weeklyDistanceText;
     private TextView weeklyWorkoutsText;
     private TextView weeklyTimeText;
+    private TextView weeklyStepsText;
+
+    private TextView allTimeDistanceText;
+    private TextView allTimeWorkoutsText;
+    private TextView allTimeTimeText;
+    private TextView allTimeStepsText;
+
+    private long allTimeTime = 0;
+    private long weeklyTimeTime = 0;
 
     private boolean editMode;
     private DecimalFormat df;
@@ -68,11 +75,29 @@ public class UserProfileActivity extends AppCompatActivity{
         //RecordWorkoutPortrait.weeklyTime = dbHandler.getWeeklyTime(user.getId());
 
         weeklyDistanceText = findViewById(R.id.weeklyDistanceText);
-        weeklyDistanceText.setText(df.format(metersToMiles(RecordWorkoutPortrait.weeklyDistance)) + " mi.");
         weeklyWorkoutsText = findViewById(R.id.weeklyWorkoutsText);
-        weeklyWorkoutsText.setText(RecordWorkoutPortrait.weeklyWorkouts + " time(s)");
         weeklyTimeText = findViewById(R.id.weeklyTimeText);
-        weeklyTimeText.setText(getDurationBreakdown(RecordWorkoutPortrait.weeklyTime));
+        weeklyStepsText = findViewById(R.id.weeklyStepsText);
+
+        weeklyTimeTime = dbHandler.getWeeklyTime(1);
+
+        weeklyDistanceText.setText(df.format(metersToMiles(dbHandler.getWeeklyDistance(1))) + " mi.");
+        weeklyWorkoutsText.setText(dbHandler.getWeeklyWorkouts(1) + " time(s)");
+        weeklyTimeText.setText(getDurationBreakdown(weeklyTimeTime));
+        weeklyStepsText.setText(dbHandler.getWeeklySteps(1) + " step(s)");
+
+        allTimeDistanceText = findViewById(R.id.allTimeDistanceText);
+        allTimeWorkoutsText = findViewById(R.id.allTimeWorkoutsText);
+        allTimeTimeText = findViewById(R.id.allTimeTimeText);
+        allTimeStepsText = findViewById(R.id.allTimeStepsText);
+
+
+        allTimeTime = dbHandler.getAllTimeTime(1);
+
+        allTimeDistanceText.setText(df.format(metersToMiles(dbHandler.getAllTimeDistance(1))) + " mi.");
+        allTimeWorkoutsText.setText(dbHandler.getAllTimeWorkouts(1) + " time(s)");
+        allTimeTimeText.setText(getDurationBreakdown(allTimeTime));
+        allTimeStepsText.setText(dbHandler.getAllTimeSteps(1) + " step(s)");
 
         t = new Thread() {
 
@@ -84,13 +109,22 @@ public class UserProfileActivity extends AppCompatActivity{
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                weeklyDistanceText.setText(df.format(metersToMiles(RecordWorkoutPortrait.weeklyDistance)) + " mi.");
-                                weeklyWorkoutsText.setText(RecordWorkoutPortrait.weeklyWorkouts + " time(s)");
                                 if(RecordWorkoutPortrait.workoutMode) {
-                                    RecordWorkoutPortrait.weeklyTime += 1000;
+                                    //weeklyTimeTime += 1000;
+
+                                    weeklyDistanceText.setText(df.format(metersToMiles(dbHandler.getWeeklyDistance(1))) + " mi.");
+                                    weeklyWorkoutsText.setText(dbHandler.getWeeklyWorkouts(1) + " time(s)");
+                                    weeklyTimeText.setText(getDurationBreakdown(dbHandler.getWeeklyTime(1)));
+                                    weeklyStepsText.setText(dbHandler.getWeeklySteps(1) + " step(s)");
+
+                                    allTimeTime += 1000;
+
+                                    allTimeDistanceText.setText(df.format(metersToMiles(dbHandler.getAllTimeDistance(1))) + " mi.");
+                                    allTimeWorkoutsText.setText(dbHandler.getAllTimeWorkouts(1) + " time(s)");
+                                    allTimeTimeText.setText(getDurationBreakdown(allTimeTime));
+                                    allTimeStepsText.setText(dbHandler.getAllTimeSteps(1) + " step(s)");
                                 }
-                                weeklyTimeText.setText(getDurationBreakdown(RecordWorkoutPortrait.weeklyTime));
-                                Log.d("UpdateDetails", "Updating textviews");
+                                //Log.d("UpdateDetails", "Updating textviews");
                             }
                         });
                     }
