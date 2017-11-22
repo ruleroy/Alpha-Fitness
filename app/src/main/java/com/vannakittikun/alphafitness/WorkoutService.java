@@ -64,7 +64,7 @@ public class WorkoutService extends Service implements SensorEventListener {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         dbHandler = new MyDBHandler(this.getApplicationContext(), null, null, 1);
-        stepCounter = dbHandler.getWeeklySteps(1);
+        stepCounter = 0;
         currentSessionID = dbHandler.getCurrentSessionID();
 
         mSensorManager.registerListener(this, mStepCounterSensor, SensorManager.SENSOR_DELAY_NORMAL, (int) (5* MICROSECONDS_IN_ONE_MINUTE));

@@ -2,7 +2,10 @@ package com.vannakittikun.alphafitness;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.os.Bundle;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -16,6 +19,7 @@ import android.widget.AdapterView;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.w3c.dom.Text;
 
@@ -42,17 +46,20 @@ public class UserProfileActivity extends AppCompatActivity{
     private TextView weeklyWorkoutsText;
     private TextView weeklyTimeText;
     private TextView weeklyStepsText;
+    private TextView weeklyCaloriesBurnedText;
 
     private TextView allTimeDistanceText;
     private TextView allTimeWorkoutsText;
     private TextView allTimeTimeText;
     private TextView allTimeStepsText;
+    private TextView allTimeCaloriesBurnedText;
 
     private long allTimeTime = 0;
     private long weeklyTimeTime = 0;
 
     private boolean editMode;
     private DecimalFormat df;
+    private DecimalFormat df2;
     Thread t;
 
 
@@ -64,6 +71,7 @@ public class UserProfileActivity extends AppCompatActivity{
 
         getSupportActionBar().setHomeButtonEnabled(true);
         df = new DecimalFormat("#.###");
+        df2 = new DecimalFormat("#.##");
 
         dbHandler = new MyDBHandler(this, null, null, 1);
         genderSpinner = findViewById(R.id.genderSpinner);
@@ -78,6 +86,7 @@ public class UserProfileActivity extends AppCompatActivity{
         weeklyWorkoutsText = findViewById(R.id.weeklyWorkoutsText);
         weeklyTimeText = findViewById(R.id.weeklyTimeText);
         weeklyStepsText = findViewById(R.id.weeklyStepsText);
+        weeklyCaloriesBurnedText = findViewById(R.id.weeklyCaloriesBurnedText);
 
         weeklyTimeTime = dbHandler.getWeeklyTime(1);
 
@@ -85,11 +94,13 @@ public class UserProfileActivity extends AppCompatActivity{
         weeklyWorkoutsText.setText(dbHandler.getWeeklyWorkouts(1) + " time(s)");
         weeklyTimeText.setText(getDurationBreakdown(weeklyTimeTime));
         weeklyStepsText.setText(dbHandler.getWeeklySteps(1) + " step(s)");
+        weeklyCaloriesBurnedText.setText(df2.format(dbHandler.getWeeklyCaloriesBurned(1)));
 
         allTimeDistanceText = findViewById(R.id.allTimeDistanceText);
         allTimeWorkoutsText = findViewById(R.id.allTimeWorkoutsText);
         allTimeTimeText = findViewById(R.id.allTimeTimeText);
         allTimeStepsText = findViewById(R.id.allTimeStepsText);
+        allTimeCaloriesBurnedText = findViewById(R.id.allTimeCaloriesBurnedText);
 
 
         allTimeTime = dbHandler.getAllTimeTime(1);
@@ -98,6 +109,7 @@ public class UserProfileActivity extends AppCompatActivity{
         allTimeWorkoutsText.setText(dbHandler.getAllTimeWorkouts(1) + " time(s)");
         allTimeTimeText.setText(getDurationBreakdown(allTimeTime));
         allTimeStepsText.setText(dbHandler.getAllTimeSteps(1) + " step(s)");
+        allTimeCaloriesBurnedText.setText(df2.format(dbHandler.getAllTimeCaloriesBurned(1)));
 
         t = new Thread() {
 
@@ -123,6 +135,7 @@ public class UserProfileActivity extends AppCompatActivity{
                                     allTimeWorkoutsText.setText(dbHandler.getAllTimeWorkouts(1) + " time(s)");
                                     allTimeTimeText.setText(getDurationBreakdown(allTimeTime));
                                     allTimeStepsText.setText(dbHandler.getAllTimeSteps(1) + " step(s)");
+                                    allTimeCaloriesBurnedText.setText(df2.format(dbHandler.getAllTimeCaloriesBurned(1)));
                                 }
                                 //Log.d("UpdateDetails", "Updating textviews");
                             }
@@ -268,7 +281,29 @@ public class UserProfileActivity extends AppCompatActivity{
                 return true;
 
             case R.id.item_reset:
+                DialogInterface.OnClickListener dialogClickListener = new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        switch (which){
+                            case DialogInterface.BUTTON_POSITIVE:
+                                dbHandler.resetDetails(1);
+                                Intent intent = getIntent();
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                                finish();
+                                startActivity(intent);
+                                break;
 
+                            case DialogInterface.BUTTON_NEGATIVE:
+                                //No button clicked
+                                break;
+                        }
+                    }
+                };
+
+                AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                builder.setTitle("Reset all records");
+                builder.setMessage("Are you sure?").setPositiveButton("Yes", dialogClickListener)
+                        .setNegativeButton("No", dialogClickListener).show();
                 return true;
 
             default:

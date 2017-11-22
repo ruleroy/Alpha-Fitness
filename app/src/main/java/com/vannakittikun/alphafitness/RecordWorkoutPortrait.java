@@ -104,17 +104,19 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
     TextView distanceText;
     long stopTime = 0;
     double distance = 0;
+    double weight = 0;
+    double calories = 0;
 
     MyDBHandler dbHandler;
 
     private BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if(intent.hasExtra("update")) {
+            if (intent.hasExtra("update")) {
                 distanceText.setText(df2.format(metersToMiles(distance)));
             }
 
-            if(intent.hasExtra("latLng")) {
+            if (intent.hasExtra("latLng")) {
                 Bundle bundle = intent.getParcelableExtra("latLng");
                 LatLng latLng = bundle.getParcelable("bundleLatLng");
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 17));
@@ -194,6 +196,8 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
         currentTime = 0;
         currentSteps = 0;
 
+        weight = dbHandler.getUser(1).getWeight();
+
 
         Log.d("WEEKLYSTEPS", Integer.toString(currentSteps));
 
@@ -202,11 +206,9 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
         distanceText = getActivity().findViewById(R.id.currentDistanceText);
         startWorkout = getActivity().findViewById(R.id.startWorkout);
 
-        chronometer.setOnChronometerTickListener(new Chronometer.OnChronometerTickListener()
-        {
+        chronometer.setOnChronometerTickListener(new Chronometer.OnChronometerTickListener() {
             @Override
-            public void onChronometerTick(Chronometer chronometer)
-            {
+            public void onChronometerTick(Chronometer chronometer) {
                 currentTime = Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime());
                 dbHandler.updateWeeklyTime(currentSessionID, currentTime);
 
@@ -220,7 +222,7 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
         if (savedInstanceState != null) {
             workoutMode = savedInstanceState.getBoolean("workoutMode");
 
-            if(workoutMode) {
+            if (workoutMode) {
                 chronometer.setBase(savedInstanceState.getLong("chronometer"));
                 chronometer.start();
                 startWorkout.setText("Stop Workout");
@@ -271,14 +273,21 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
             @Override
             public void onClick(View view) {
                 currentSteps = dbHandler.getCurrentSessionSteps(currentSessionID);
-                dbHandler.updateUserDetails(currentSessionID, 1, distance, currentSteps, Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()), weeklyWorkouts, 100);
+                calories = calculateCalories();
+
+                if(!workoutMode){
+                    dbHandler.updateUserDetails(currentSessionID, 1, distance, currentSteps, Math.abs(stopTime), weeklyWorkouts, calories);
+                } else {
+                    dbHandler.updateUserDetails(currentSessionID, 1, distance, currentSteps, Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()), weeklyWorkouts, calories);
+                }
+
                 Intent intent = new Intent(getActivity(), UserProfileActivity.class);
                 startActivity(intent);
             }
         });
 
         ImageView imageView2 = view.findViewById(R.id.imageView2);
-        imageView2.setOnClickListener(new View.OnClickListener(){
+        imageView2.setOnClickListener(new View.OnClickListener() {
 
             @Override
             public void onClick(View view) {
@@ -395,7 +404,8 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
 
                 dbHandler.addLocation(currentLatitude, currentLongitude, Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()));
                 currentSteps = dbHandler.getCurrentSessionSteps(currentSessionID);
-                dbHandler.updateUserDetails(currentSessionID, 1, distance, currentSteps, Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()), weeklyWorkouts, 100);
+                calories = calculateCalories();
+                dbHandler.updateUserDetails(currentSessionID, 1, distance, currentSteps, Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()), weeklyWorkouts, calories);
                 //Toast.makeText(getActivity(), "Time: " + Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()) + " Distance: " + distance, Toast.LENGTH_SHORT).show();
                 //createPolyLine();
                 addPolyLine();
@@ -420,25 +430,25 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
         Log.d("PATH", Integer.toString(path.size()));
 
         if (path.size() >= 2) {
-            for(int i = 0; i<path.size()-1; i++){
-                line = mMap.addPolyline(new PolylineOptions().add(path.get(i), path.get(i+1)).width(5).color(Color.RED));
-                Log.d("ADD POLYLINE", "Attempted to add polyline " + "Path 1: " + path.get(i) + " Path 2: " + path.get(i+1));
+            for (int i = 0; i < path.size() - 1; i++) {
+                line = mMap.addPolyline(new PolylineOptions().add(path.get(i), path.get(i + 1)).width(5).color(Color.RED));
+                Log.d("ADD POLYLINE", "Attempted to add polyline " + "Path 1: " + path.get(i) + " Path 2: " + path.get(i + 1));
             }
             //Log.d("PATH", "Path 1: " + path.get(0) + " Path 2: " + path.get(1));
         }
     }
 
-    private void calculateDistance(){
+    private void calculateDistance() {
         ArrayList<LatLng> path = dbHandler.getTotalPath();
         if (path.size() >= 2) {
             distance = 0;
-            for(int i = 0; i<path.size()-1; i++){
+            for (int i = 0; i < path.size() - 1; i++) {
                 Location location1 = new Location("");
                 Location location2 = new Location("");
                 location1.setLatitude(path.get(i).latitude);
                 location1.setLongitude(path.get(i).longitude);
-                location2.setLatitude(path.get(i+1).latitude);
-                location2.setLongitude(path.get(i+1).longitude);
+                location2.setLatitude(path.get(i + 1).latitude);
+                location2.setLongitude(path.get(i + 1).longitude);
                 if (location1.distanceTo(location2) > 4.572) {
                     distance += location1.distanceTo(location2);
                 }
@@ -446,6 +456,10 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
             //Log.d("PATH", "Path 1: " + path.get(0) + " Path 2: " + path.get(1));
             distanceText.setText(df2.format(metersToMiles(distance)));
         }
+    }
+
+    private double calculateCalories() {
+        return ((weight * 28) / 100000) * currentSteps;
     }
 
     public double metersToMiles(double meters) {
@@ -456,7 +470,7 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
     public void onResume() {
         super.onResume();
         IntentFilter intentFilter = new IntentFilter("record_workout");
-        getActivity().registerReceiver(receiver,intentFilter);
+        getActivity().registerReceiver(receiver, intentFilter);
     }
 
     @Override
@@ -507,7 +521,7 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
         getActivity().startService(new Intent(getActivity(), WorkoutService.class));
     }
 
-    private void stopWorkoutService(){
+    private void stopWorkoutService() {
         getActivity().stopService(new Intent(getActivity(), WorkoutService.class));
     }
 
@@ -560,7 +574,7 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
         } else {
             if (!workoutMode) {
                 Toast.makeText(getActivity(), "Workout started!", Toast.LENGTH_SHORT).show();
-
+                weight = dbHandler.getUser(1).getWeight();
                 dbHandler.deleteAllLocation();
                 dbHandler.newUserDetailsSession(1);
                 currentSessionID = dbHandler.getCurrentSessionID();
@@ -579,8 +593,8 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
                 mFusedLocationClient.requestLocationUpdates(getCurrentLocation, updateLocationCallback, Looper.myLooper());
 
                 mLocationRequestUpdate = new LocationRequest();
-                mLocationRequestUpdate.setInterval(15000); //5 seconds
-                mLocationRequestUpdate.setFastestInterval(10000); //3 seconds
+                mLocationRequestUpdate.setInterval(5000);
+                mLocationRequestUpdate.setFastestInterval(3000);
                 mLocationRequestUpdate.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
                 //mLocationRequestUpdate.setSmallestDisplacement(4.572F); //1/10 meter
                 mFusedLocationClient.requestLocationUpdates(mLocationRequestUpdate, mLocationCallbackUpdate, Looper.myLooper());
@@ -616,7 +630,8 @@ public class RecordWorkoutPortrait extends Fragment implements OnMapReadyCallbac
                 Toast.makeText(getActivity(), "Workout done!", Toast.LENGTH_SHORT).show();
 
                 currentSteps = dbHandler.getCurrentSessionSteps(currentSessionID);
-                dbHandler.updateUserDetails(currentSessionID, 1, distance, currentSteps, Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()), weeklyWorkouts, 100);
+                calories = calculateCalories();
+                dbHandler.updateUserDetails(currentSessionID, 1, distance, currentSteps, Math.abs(chronometer.getBase() - SystemClock.elapsedRealtime()), weeklyWorkouts, calories);
             }
         }
 

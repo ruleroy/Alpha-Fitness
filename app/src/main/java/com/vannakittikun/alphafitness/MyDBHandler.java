@@ -21,12 +21,13 @@ import java.util.List;
 
 public class MyDBHandler extends SQLiteOpenHelper {
 
-    private static final int DATABASE_VERSION = 25;
+    private static final int DATABASE_VERSION = 26;
     private static final String DATABASE_NAME = "locationDB";
 
     public static final String TABLE_LOCATION = "location";
     public static final String TABLE_USER = "user";
     public static final String TABLE_DETAILS = "details";
+    public static final String TABLE_CHART = "chart";
 
     public static final String COLUMN_ID = "_id";
     public static final String COLUMN_LAT = "lat";
@@ -43,6 +44,11 @@ public class MyDBHandler extends SQLiteOpenHelper {
     public static final String DETAILS_AVG_TIME = "avgTime";
     public static final String DETAILS_AVG_WORKOUTS = "avgWorkouts";
     public static final String DETAILS_AVG_CALORIES_BURNED = "avgCaloriesBurned";
+
+    public static final String CHART_USER_ID = "userID";
+    public static final String CHART_STEPS = "chartSteps";
+    public static final String CHART_CALORIES = "chartCalories";
+    public static final String CHART_TIME = "chartTime";
 
     public MyDBHandler(Context context, String name, SQLiteDatabase.CursorFactory factory, int version) {
         super(context, DATABASE_NAME, factory, DATABASE_VERSION);
@@ -83,6 +89,15 @@ public class MyDBHandler extends SQLiteOpenHelper {
                 DETAILS_AVG_CALORIES_BURNED + " INTEGER DEFAULT 0" +
                 ");";
         sqLiteDatabase.execSQL(query3);
+
+        String query4 = "CREATE TABLE " + TABLE_CHART + "(" +
+                COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                CHART_USER_ID + " INTEGER," +
+                CHART_STEPS + " INTEGER DEFAULT 0," +
+                CHART_CALORIES + " INTEGER DEFAULT 0," +
+                CHART_TIME + " INTEGER DEFAULT 0" +
+                ");";
+        sqLiteDatabase.execSQL(query4);
     }
 
     @Override
@@ -156,7 +171,7 @@ public class MyDBHandler extends SQLiteOpenHelper {
         return session;
     }
 
-    public void updateUserDetails(int id, int userid, double dist, int steps, long time, int workouts, int cals) {
+    public void updateUserDetails(int id, int userid, double dist, int steps, long time, int workouts, double cals) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
         //values.put(COLUMN_ID, id);
@@ -167,9 +182,16 @@ public class MyDBHandler extends SQLiteOpenHelper {
         values.put(DETAILS_AVG_WORKOUTS, workouts);
         values.put(DETAILS_AVG_CALORIES_BURNED, cals);
 
+        ContentValues values2 = new ContentValues();
+        values2.put(CHART_USER_ID, userid);
+        values2.put(CHART_STEPS, steps);
+        values2.put(CHART_CALORIES, cals);
+        values2.put(CHART_TIME, time);
+
         if(userExists(userid)) {
             //Log.d("DBUPDATE", "updated");
             db.update(TABLE_DETAILS, values, "_id=" + Integer.toString(id), null);
+            db.insert(TABLE_CHART, null, values2);
         } else {
             //db.insert(TABLE_DETAILS, null, values);
             //Log.d("DBINSERT", "inserted");
@@ -217,6 +239,19 @@ public class MyDBHandler extends SQLiteOpenHelper {
         return time;
     }
 
+    public double getAllTimeCaloriesBurned(int userid) {
+        double calories = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT SUM(" + DETAILS_AVG_CALORIES_BURNED + ")" + " FROM " + TABLE_DETAILS + " WHERE " + DETAILS_USER_ID + "=" + Integer.toString(userid), null);
+        c.moveToFirst();
+        if (c.getCount() > 0) {
+            calories = c.getDouble(0);
+        }
+        c.close();
+        //db.close();
+        return calories;
+    }
+
     public int getAllTimeWorkouts(int userid) {
         int steps = 0;
         SQLiteDatabase db = this.getWritableDatabase();
@@ -242,6 +277,19 @@ public class MyDBHandler extends SQLiteOpenHelper {
         c.close();
         //db.close();
         return workouts;
+    }
+
+    public double getWeeklyCaloriesBurned(int userid) {
+        double calories = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT AVG(" + DETAILS_AVG_CALORIES_BURNED + ")" + " FROM " + TABLE_DETAILS + " WHERE " + DETAILS_USER_ID + "=" + Integer.toString(userid), null);
+        c.moveToFirst();
+        if (c.getCount() > 0) {
+            calories = c.getDouble(0);
+        }
+        c.close();
+        //db.close();
+        return calories;
     }
 
     public double getWeeklyDistance(int userid) {
@@ -316,6 +364,60 @@ public class MyDBHandler extends SQLiteOpenHelper {
         return steps;
     }
 
+    public double getCurrentSessionDistance(int id){
+        double dist = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT * FROM " + TABLE_DETAILS + " WHERE " + COLUMN_ID + "=" + Integer.toString(id), null);
+        c.moveToFirst();
+        if (c.getCount() > 0) {
+            dist = c.getDouble(c.getColumnIndex(DETAILS_AVG_DIST));
+        }
+        c.close();
+        //db.close();
+        return dist;
+    }
+
+    public long getCurrentSessionTime(int id){
+        long time = 0;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT * FROM " + TABLE_DETAILS + " WHERE " + COLUMN_ID + "=" + Integer.toString(id), null);
+        c.moveToFirst();
+        if (c.getCount() > 0) {
+            time = c.getLong(c.getColumnIndex(DETAILS_AVG_TIME));
+        }
+        c.close();
+        //db.close();
+        return time;
+    }
+
+    public List<Integer> getChartSteps(int userid){
+        List<Integer> steps = new ArrayList<>();
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT * FROM " + TABLE_CHART + " WHERE " + CHART_USER_ID + "=" + Integer.toString(userid), null);
+        c.moveToFirst();
+        while (!c.isAfterLast()) {
+            steps.add(c.getInt(c.getColumnIndex(CHART_STEPS)));
+            c.moveToNext();
+        }
+        c.close();
+        //db.close();
+        return steps;
+    }
+
+    public List<Double> getChartCalories(int userid){
+        List<Double> calories = new ArrayList<>();
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor c = db.rawQuery("SELECT * FROM " + TABLE_CHART + " WHERE " + CHART_USER_ID + "=" + Integer.toString(userid), null);
+        c.moveToFirst();
+        while (!c.isAfterLast()) {
+            calories.add(c.getDouble(c.getColumnIndex(CHART_CALORIES)));
+            c.moveToNext();
+        }
+        c.close();
+        //db.close();
+        return calories;
+    }
+
     public boolean userExists(int id) {
         SQLiteDatabase db = this.getWritableDatabase();
         String Query = "SELECT * FROM " + TABLE_USER + " WHERE " + COLUMN_ID + "=\"" + id + "\";";
@@ -350,6 +452,17 @@ public class MyDBHandler extends SQLiteOpenHelper {
         SQLiteDatabase db = this.getWritableDatabase();
         db.execSQL("UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='" + TABLE_LOCATION + "'");
         db.execSQL("DELETE FROM " + TABLE_LOCATION);
+
+        db.execSQL("UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='" + TABLE_CHART + "'");
+        db.execSQL("DELETE FROM " + TABLE_CHART);
+        //db.close();
+    }
+
+    public void resetDetails(int userid) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.execSQL("UPDATE SQLITE_SEQUENCE SET SEQ=1 WHERE NAME='" + TABLE_DETAILS + "'");
+        db.execSQL("DELETE FROM " + TABLE_DETAILS + " WHERE userID=" + userid + ";");
+
         //db.close();
     }
 
